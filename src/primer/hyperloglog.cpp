@@ -16,7 +16,9 @@ namespace bustub {
 
 /** @brief Parameterized constructor. */
 template <typename KeyType>
-HyperLogLog<KeyType>::HyperLogLog(int16_t n_bits) : cardinality_(0) {}
+HyperLogLog<KeyType>::HyperLogLog(int16_t n_bits) : cardinality_(0) {
+  registers_.resize(1 << n_bits);
+}
 
 /**
  * @brief Function that computes binary.
