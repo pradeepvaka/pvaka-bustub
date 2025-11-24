@@ -60,10 +60,10 @@ template <typename KeyType>
 auto HyperLogLog<KeyType>::AddElem(KeyType val) -> void {
   hash_t hash = CalculateHash(val);
   std::bitset<BITSET_CAPACITY> binary = ComputeBinary(hash);
-  
+
   // Get the number of buckets (registers)
   size_t num_buckets = registers_.size();
-  
+
   // Calculate the number of bits needed for bucket index
   size_t bits_for_index = 0;
   size_t temp = num_buckets;
@@ -71,7 +71,7 @@ auto HyperLogLog<KeyType>::AddElem(KeyType val) -> void {
     temp >>= 1;
     bits_for_index++;
   }
-  
+
   // Extract bucket index from the MOST significant bits
   size_t bucket_index = 0;
   for (size_t i = 0; i < bits_for_index; i++) {
@@ -79,19 +79,19 @@ auto HyperLogLog<KeyType>::AddElem(KeyType val) -> void {
       bucket_index |= (1ULL << (bits_for_index - 1 - i));
     }
   }
-  
+
   // Create a bitset for the remaining bits (after removing the index bits from MSB)
   std::bitset<BITSET_CAPACITY> remaining_bits;
   for (size_t i = bits_for_index; i < BITSET_CAPACITY; i++) {
     remaining_bits.set(BITSET_CAPACITY - 1 - i, binary.test(BITSET_CAPACITY - 1 - i));
   }
-  
+
   // Get position of leftmost 1 in remaining bits
   uint64_t position = PositionOfLeftmostOne(remaining_bits);
   // Calculate rho: if position is 0, means all zeros, rho = BITSET_CAPACITY - bits_for_index + 1
   // Otherwise, rho = (BITSET_CAPACITY - bits_for_index) - position + 1
   uint64_t rho = (BITSET_CAPACITY - bits_for_index) - position + 1;
-  
+
   // Update the register with the maximum value
   std::bitset<BITSET_CAPACITY> new_value(rho);
   if (new_value.to_ullong() > registers_[bucket_index].to_ullong()) {
@@ -106,12 +106,17 @@ template <typename KeyType>
 auto HyperLogLog<KeyType>::ComputeCardinality() -> void {
   size_t num_buckets = registers_.size();
   double sum = 0.0;
-  
+
   for (size_t i = 0; i < num_buckets; i++) {
     uint64_t register_value = registers_[i].to_ullong();
-    sum += 1.0 / (1ULL << register_value);
+    if (register_value >= 64) {
+      // Avoid undefined behavior for shift >= 64
+      sum += 0.0;
+    } else {
+      sum += 1.0 / (1ULL << register_value);
+    }
   }
-  
+
   double raw_estimate = CONSTANT * num_buckets * num_buckets / sum;
   cardinality_ = static_cast<size_t>(raw_estimate);
 }
